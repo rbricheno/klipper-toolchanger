@@ -38,6 +38,13 @@ class ToolsCalibrate:
         self.lift_speed = config.getfloat('lift_speed',
                                           self.probe_multi_axis.lift_speed)
         self.final_lift_z = config.getfloat('final_lift_z', 4.0)
+
+        # Some printers have a probe that extends out over the bed, from a true
+        # center that is located probe_extension mm further back. 'None' is a
+        # flag to show this is not used and we can probe near_y and far_y as
+        # normal.
+        self.probe_extension = config.getfloat('probe_extension', None)
+      
         self.sensor_location = None
         self.last_result = [0., 0., 0.]
         self.last_probe_offset = 0.
@@ -78,9 +85,16 @@ class ToolsCalibrate:
     def calibrate_xy(self, toolhead, top_pos, gcmd, samples=None):
         left_x = self.probe_xy(toolhead, top_pos, 'x+', gcmd, samples=samples)
         right_x = self.probe_xy(toolhead, top_pos, 'x-', gcmd, samples=samples)
-        near_y = self.probe_xy(toolhead, top_pos, 'y+', gcmd, samples=samples)
-        far_y = self.probe_xy(toolhead, top_pos, 'y-', gcmd, samples=samples)
-        return [(left_x + right_x) / 2., (near_y + far_y) / 2.]
+
+        if self.probe_extension is not None:
+            # We only probe the front edge of the probe, and use probe_extension
+            # to calculate its center.
+            near_y = self.probe_xy(toolhead, top_pos, 'y+', gcmd, samples=samples)
+            return [(left_x + right_x) / 2., near_y + self.probe_extension]
+        else:
+            near_y = self.probe_xy(toolhead, top_pos, 'y+', gcmd, samples=samples)
+            far_y = self.probe_xy(toolhead, top_pos, 'y-', gcmd, samples=samples)
+            return [(left_x + right_x) / 2., (near_y + far_y) / 2.]
 
     def locate_sensor(self, gcmd):
         toolhead = self.printer.lookup_object('toolhead')
