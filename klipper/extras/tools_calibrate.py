@@ -39,11 +39,21 @@ class ToolsCalibrate:
                                           self.probe_multi_axis.lift_speed)
         self.final_lift_z = config.getfloat('final_lift_z', 4.0)
 
-        # Some printers have a probe that extends out over the bed, from a true
-        # center that is located probe_extension mm further back. 'None' is a
-        # flag to show this is not used and we can probe near_y and far_y as
-        # normal.
-        self.probe_extension = config.getfloat('probe_extension', None)
+        # Some printers have a probe that extends out over the bed, on a
+        # cantilever, from a true center that is located further back.
+        # For these printers, we only probe the very front of the cantilever,
+        # and then pretend that the probe has a "fake center".
+        # probe_fake_center is a value we use to offset the y probed value
+        # back by a predefined constant distance. This is actually the y
+        # location that we want to use for the toolheads when probling for the x
+        # offsets.
+        # For example, if it would be reasonable to hit the probe with the nozzle
+        # at a distance of 1.5mm back from the front of the probe, set the value 
+        # of probe_fake_center to 1.5
+        # If you don't have a crazy cantilever probe like this, None (or
+        # undefined) will continue to use the normal behavior, in which the front
+        # and back of the probe are both tested.
+        self.probe_fake_center = config.getfloat('probe_fake_center', None)
       
         self.sensor_location = None
         self.last_result = [0., 0., 0.]
@@ -86,11 +96,11 @@ class ToolsCalibrate:
         left_x = self.probe_xy(toolhead, top_pos, 'x+', gcmd, samples=samples)
         right_x = self.probe_xy(toolhead, top_pos, 'x-', gcmd, samples=samples)
 
-        if self.probe_extension is not None:
-            # We only probe the front edge of the probe, and use probe_extension
-            # to calculate its center.
+        if self.probe_fake_center is not None:
+            # We only probe the front edge of the probe, and use probe_fake_center
+            # to pretend its center is probe_fake_center mm further back.
             near_y = self.probe_xy(toolhead, top_pos, 'y+', gcmd, samples=samples)
-            return [(left_x + right_x) / 2., near_y + self.probe_extension]
+            return [(left_x + right_x) / 2., near_y + self.probe_fake_center]
         else:
             near_y = self.probe_xy(toolhead, top_pos, 'y+', gcmd, samples=samples)
             far_y = self.probe_xy(toolhead, top_pos, 'y-', gcmd, samples=samples)
